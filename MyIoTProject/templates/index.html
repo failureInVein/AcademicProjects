@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Irrigation System - Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2E7D32;
+            --secondary: #4CAF50;
+            --warning: #FF9800;
+            --danger: #F44336;
+            --info: #2196F3;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+            margin-bottom: 20px;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .sensor-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .unit {
+            font-size: 1rem;
+            color: #666;
+        }
+        
+        .prediction-box {
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+            margin: 20px 0;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        
+        .irrigation-needed {
+            background: linear-gradient(135deg, var(--danger), #ff6b6b);
+            animation: pulse 2s infinite;
+        }
+        
+        .no-irrigation {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .connected { background-color: #4CAF50; }
+        .disconnected { background-color: #F44336; }
+        
+        .control-btn {
+            padding: 10px 25px;
+            margin: 5px;
+            border-radius: 50px;
+            font-weight: bold;
+        }
+        
+        .manual-input {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .footer {
+            margin-top: 30px;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, var(--primary), var(--secondary));">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-tint"></i> Smart Irrigation System
+            </a>
+            <div class="navbar-text text-white">
+                <span class="status-indicator" id="connectionStatus"></span>
+                <span id="connectionText">Connecting...</span>
+                | Last Update: <span id="lastUpdate">--:--:--</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+        <!-- Prediction Display -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="prediction-box" id="predictionDisplay">
+                    <div class="display-4 mb-3"><i class="fas fa-cloud-rain"></i></div>
+                    <div id="predictionText">Loading prediction...</div>
+                    <div id="predictionSubtext" class="mt-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sensor Cards -->
+        <div class="row g-4 mb-4">
+            <!-- Rainfall -->
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-cloud-rain fa-3x mb-3 text-info"></i>
+                        <h5 class="card-title">Rainfall</h5>
+                        <div class="sensor-value text-info">
+                            <span id="rainfallValue">0</span><span class="unit">mm</span>
+                        </div>
+                        <p class="text-muted mb-0">Last hour</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Soil Moisture -->
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-seedling fa-3x mb-3 text-success"></i>
+                        <h5 class="card-title">Soil Moisture</h5>
+                        <div class="sensor-value text-success">
+                            <span id="moistureValue">0</span><span class="unit">%</span>
+                        </div>
+                        <p class="text-muted mb-0">Current level</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Water Level -->
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-water fa-3x mb-3 text-primary"></i>
+                        <h5 class="card-title">Water Level</h5>
+                        <div class="sensor-value text-primary">
+                            <span id="waterLevelValue">0</span><span class="unit">cm</span>
+                        </div>
+                        <p class="text-muted mb-0">Reservoir</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Temperature -->
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-thermometer-half fa-3x mb-3 text-warning"></i>
+                        <h5 class="card-title">Temperature</h5>
+                        <div class="sensor-value text-warning">
+                            <span id="temperatureValue">0</span><span class="unit">°C</span>
+                        </div>
+                        <p class="text-muted mb-0">Air temperature</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Humidity -->
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-tint fa-3x mb-3 text-secondary"></i>
+                        <h5 class="card-title">Humidity</h5>
+                        <div class="sensor-value text-secondary">
+                            <span id="humidityValue">0</span><span class="unit">%</span>
+                        </div>
+                        <p class="text-muted mb-0">Air humidity</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Crop Type -->
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-tractor fa-3x mb-3" style="color: var(--primary);"></i>
+                        <h5 class="card-title">Crop Type</h5>
+                        <div class="sensor-value" style="color: var(--primary);">
+                            <span id="cropType">Rice</span>
+                        </div>
+                        <div class="btn-group btn-group-sm mt-2">
+                            <button class="btn btn-outline-success" onclick="setCrop('rice')">Rice</button>
+                            <button class="btn btn-outline-warning" onclick="setCrop('jute')">Jute</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h4 class="card-title"><i class="fas fa-cogs me-2"></i>Control Panel</h4>
+                        <div class="text-center mt-3">
+                            <button class="btn btn-success control-btn" onclick="sendCommand('start')">
+                                <i class="fas fa-play me-2"></i>Start Irrigation
+                            </button>
+                            <button class="btn btn-danger control-btn" onclick="sendCommand('stop')">
+                                <i class="fas fa-stop me-2"></i>Stop Irrigation
+                            </button>
+                            <button class="btn btn-info control-btn" onclick="sendCommand('test')">
+                                <i class="fas fa-bolt me-2"></i>Test Prediction
+                            </button>
+                            <button class="btn btn-warning control-btn" onclick="restartSerial()">
+                                <i class="fas fa-sync-alt me-2"></i>Restart Serial
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts and Manual Input -->
+        <div class="row">
+            <!-- Charts -->
+            <div class="col-lg-8">
+                <div class="chart-container">
+                    <h4 class="mb-3"><i class="fas fa-chart-line me-2"></i>Sensor Trends</h4>
+                    <canvas id="sensorChart" height="250"></canvas>
+                </div>
+            </div>
+
+            <!-- Manual Prediction -->
+            <div class="col-lg-4">
+                <div class="manual-input">
+                    <h4 class="mb-3"><i class="fas fa-calculator me-2"></i>Manual Prediction</h4>
+                    <div class="mb-3">
+                        <label class="form-label">Rainfall (mm)</label>
+                        <input type="number" class="form-control" id="manualRainfall" value="0" step="0.1">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Soil Moisture (%)</label>
+                        <input type="number" class="form-control" id="manualMoisture" value="0" step="0.1">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Crop Type</label>
+                        <select class="form-select" id="manualCrop">
+                            <option value="rice">Rice</option>
+                            <option value="jute">Jute</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary w-100" onclick="manualPrediction()">
+                        <i class="fas fa-brain me-2"></i>Predict Irrigation
+                    </button>
+                    <div id="manualResult" class="mt-3 text-center"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5><i class="fas fa-info-circle me-2"></i>System Status</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>ML Model:</strong> 
+                                    <span id="modelStatus" class="badge bg-success">Loaded</span>
+                                </p>
+                                <p><strong>Serial Port:</strong> 
+                                    <span id="serialPort" class="badge bg-info">COM4</span>
+                                </p>
+                                <p><strong>Update Rate:</strong> 
+                                    <span class="badge bg-secondary">2 seconds</span>
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Data Points:</strong> 
+                                    <span id="dataPoints" class="badge bg-primary">0</span>
+                                </p>
+                                <p><strong>Server Time:</strong> 
+                                    <span id="serverTime">--:--:--</span>
+                                </p>
+                                <p><strong>ML Accuracy:</strong> 
+                                    <span class="badge bg-success">~95%</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Smart Irrigation System &copy; 2024 | ML-Powered Decision Making</p>
+            <p class="small">Real-time prediction using Decision Tree Classifier</p>
+        </div>
+    </div>
+
+    <script>
+        // Initialize chart
+        const ctx = document.getElementById('sensorChart').getContext('2d');
+        let sensorChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Rainfall (mm)',
+                        data: [],
+                        borderColor: '#2196F3',
+                        backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Soil Moisture (%)',
+                        data: [],
+                        borderColor: '#4CAF50',
+                        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Temperature (°C)',
+                        data: [],
+                        borderColor: '#FF9800',
+                        backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Data storage for chart
+        let chartData = [];
+        let dataPoints = 0;
+
+        // Update dashboard data
+        function updateData() {
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    // Update connection status
+                    const statusIndicator = document.getElementById('connectionStatus');
+                    const statusText = document.getElementById('connectionText');
+                    
+                    if (data.is_connected) {
+                        statusIndicator.className = 'status-indicator connected';
+                        statusText.textContent = 'Connected';
+                    } else {
+                        statusIndicator.className = 'status-indicator disconnected';
+                        statusText.textContent = 'Disconnected';
+                    }
+                    
+                    // Update sensor values
+                    document.getElementById('rainfallValue').textContent = data.rainfall.toFixed(1);
+                    document.getElementById('moistureValue').textContent = data.moisture.toFixed(1);
+                    document.getElementById('waterLevelValue').textContent = data.water_level;
+                    document.getElementById('temperatureValue').textContent = data.temperature.toFixed(1);
+                    document.getElementById('humidityValue').textContent = data.humidity.toFixed(1);
+                    document.getElementById('cropType').textContent = data.crop_type;
+                    document.getElementById('lastUpdate').textContent = data.last_update;
+                    document.getElementById('serialPort').textContent = data.serial_port;
+                    
+                    // Update prediction display
+                    const predictionBox = document.getElementById('predictionDisplay');
+                    const predictionText = document.getElementById('predictionText');
+                    const predictionSubtext = document.getElementById('predictionSubtext');
+                    
+                    if (data.prediction === 1) {
+                        predictionBox.className = 'prediction-box irrigation-needed';
+                        predictionText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> IRRIGATION NEEDED!';
+                        predictionSubtext.textContent = `Low moisture detected (${data.moisture.toFixed(1)}%)`;
+                    } else {
+                        predictionBox.className = 'prediction-box no-irrigation';
+                        predictionText.innerHTML = '<i class="fas fa-check-circle me-2"></i> NO IRRIGATION REQUIRED';
+                        predictionSubtext.textContent = `Conditions are optimal (Moisture: ${data.moisture.toFixed(1)}%)`;
+                    }
+                    
+                    // Update chart
+                    const now = new Date();
+                    const timeLabel = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    
+                    // Add new data point
+                    chartData.push({
+                        time: timeLabel,
+                        rainfall: data.rainfall,
+                        moisture: data.moisture,
+                        temperature: data.temperature
+                    });
+                    
+                    // Keep only last 20 data points
+                    if (chartData.length > 20) {
+                        chartData.shift();
+                    }
+                    
+                    // Update chart
+                    sensorChart.data.labels = chartData.map(d => d.time);
+                    sensorChart.data.datasets[0].data = chartData.map(d => d.rainfall);
+                    sensorChart.data.datasets[1].data = chartData.map(d => d.moisture);
+                    sensorChart.data.datasets[2].data = chartData.map(d => d.temperature);
+                    sensorChart.update();
+                    
+                    // Update counters
+                    dataPoints++;
+                    document.getElementById('dataPoints').textContent = dataPoints;
+                    
+                    // Update server time
+                    document.getElementById('serverTime').textContent = 
+                        now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    document.getElementById('connectionText').textContent = 'Connection Error';
+                });
+        }
+
+        // Control functions
+        function sendCommand(command) {
+            fetch(`/api/control/${command}`)
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    if (command === 'test' && data.prediction !== undefined) {
+                        const result = data.prediction === 1 ? 'IRRIGATION NEEDED' : 'NO IRRIGATION';
+                        alert(`Test Prediction: ${result}`);
+                    }
+                })
+                .catch(error => {
+                    alert('Error sending command: ' + error);
+                });
+        }
+
+        function setCrop(crop) {
+            fetch(`/api/set_crop/${crop}`)
+                .then(response => response.json())
+                .then(data => {
+                    alert(`Crop changed to ${data.crop}`);
+                    updateData();
+                });
+        }
+
+        function manualPrediction() {
+            const rainfall = parseFloat(document.getElementById('manualRainfall').value);
+            const moisture = parseFloat(document.getElementById('manualMoisture').value);
+            const crop = document.getElementById('manualCrop').value;
+            
+            fetch('/api/manual_prediction', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    rainfall: rainfall,
+                    moisture: moisture,
+                    crop: crop
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const resultDiv = document.getElementById('manualResult');
+                    const alertClass = data.prediction === 1 ? 'alert-danger' : 'alert-success';
+                    resultDiv.innerHTML = `
+                        <div class="alert ${alertClass}">
+                            <h5>${data.text}</h5>
+                            <p class="mb-0">Rainfall: ${rainfall}mm | Moisture: ${moisture}% | Crop: ${crop}</p>
+                        </div>
+                    `;
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            });
+        }
+
+        function restartSerial() {
+            fetch('/api/restart_serial')
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    updateData();
+                });
+        }
+
+        // Auto-refresh every 2 seconds
+        setInterval(updateData, 2000);
+        
+        // Initial load
+        updateData();
+    </script>
+</body>
+</html>
